@@ -1,0 +1,8 @@
+import(igraph)
+import(rdiversity)
+import(Matrix.utils) 
+importFrom("stats", "as.dist")
+importFrom("utils", "setTxtProgressBar", "txtProgressBar")
+export(getMetaweb)
+export(divPartition)
+export(disPairwise)
