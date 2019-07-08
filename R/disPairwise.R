@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with econetwork.  If not, see <http://www.gnu.org/licenses/>
 
-disPairwise <- function(gList, groups=NULL, eta=1, type=c('P','L','Pi')){
+disPairwise <- function(gList, groups=NULL, eta=1, type=c('P','L','Pi'), abTable=NULL){
   
   if(sum(unlist(lapply(lapply(gList,FUN = function(x) V(x)$name),is.null)))>0){#check if nodes have names
     stop('nodes must have names (use V(g)$name)')
@@ -28,6 +28,29 @@ disPairwise <- function(gList, groups=NULL, eta=1, type=c('P','L','Pi')){
   }
   if(prod(names(groups) %in% unique(unlist(lapply(gList,FUN = function(g) V(g)$name))))*prod(unique(unlist(lapply(gList,FUN = function(g) V(g)$name))) %in% names(groups))!=1){ #check if the names of groups match to the names of the metaweb
     stop("the names of groups vector do not match to the names of the metaweb")
+  }
+  
+  ##consider the abTalbe
+  if(!is.null(abTable)){
+    #check whether the names of abTable correspond of the groups vector (and so to the nodes of the network)
+    if(sum(!setequal(rownames(abTable),names(groups)))){
+      stop('the rownames of abTable do not match to the names of the nodes of the metaweb')}
+      #check whether the number of columns of the abundance table is the same as the number of local networks
+      if(ncol(abTable) != length(gList)){'The number of columns of abTable is no the same as the length of gList'}
+      #check whether the species that have non-null abundances are present in the local networks
+      if (!prod(unlist(lapply(1:length(gList), function(i) setequal(V(gList[[i]])$name, rownames(abTable)[which(abTable[, i] > 0)]))))){
+        stop('the species that have non-nul abundances in abTable do not match with the nodes of the local networks (gList)')
+      }
+      #create a vertex attribute ab
+      for(k in 1:length(gList)){
+        gList[[k]] = set_vertex_attr(gList[[k]],name = "ab",value = abTable[V(gList[[k]])$name,k]/sum(abTable[V(gList[[k]])$name,k]))
+      }
+  } 
+  if(is.null(abTable)){
+    #uniform abundance on the nodes
+    for(k in 1:length(gList)){
+      gList[[k]] = set_vertex_attr(gList[[k]],name = "ab",value = 1/length(V(gList[[k]])))
+    }
   }
 
   metaweb.array <- metawebParams(gList,groups) #get the metaweb array

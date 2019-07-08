@@ -19,20 +19,24 @@ sbmParams <- function(g, groups=NULL){
         groups=V(g)$name
         names(groups)=V(g)$name
     }
-  
-    alpha.vec <- table(groups) #frequencies of the groups
+    
+    alpha.vec <- V(g)$ab #abundance of the groups of the groups
+    names(alpha.vec) <- V(g)$name
+    alpha.vec = t(as.matrix(aggregate.Matrix(alpha.vec,groups,fun = 'sum')))
+    
     if(is.null(E(g)$weight)){#get the (weighted adjacency matrix)
         adj.mat <- get.adjacency(g)
-    }  else {
-        adj.mat <- get.adjacency(g,attr = "weight")
+    }  else { # the weight should represent a probability of link and must be so btwn 0 and 1
+        adj.mat <- get.adjacency(g,attr = "weight")/max(E(g)$weight)
     }
-    l.mat<-as.matrix(aggregate.Matrix(t(as.matrix(aggregate.Matrix(adj.mat,groups,fun='sum'))),groups,fun='sum'))[names(alpha.vec),names(alpha.vec)] #aggregate the adjacency matrix at a group level
-    pi.mat<-l.mat/(alpha.vec%*%t(alpha.vec)) #link probability matrix
+    adj.mat.w <- adj.mat*V(g)$ab%*%t(V(g)$ab) #weight by species abundances (i.e. matrix of L_{ql} in the paper)
+    l.mat<-as.matrix(aggregate.Matrix(t(as.matrix(aggregate.Matrix(adj.mat.w,groups,fun='sum'))),groups,fun='sum'))[colnames(alpha.vec),colnames(alpha.vec)] #aggregate the adjacency matrix at a group level
+    pi.mat<-l.mat/(t(alpha.vec)%*%alpha.vec) #link probability matrix
     
     return(list(alpha=alpha.vec,
                 l=l.mat,
                 pi=pi.mat,
-                C=sum(adj.mat)/(length(V(g))*length(V(g)))))
+                C=sum(adj.mat.w)))
 }
 
 metawebParams <- function(gList, groups, priorMetaweb=FALSE){
@@ -68,7 +72,7 @@ metawebParams <- function(gList, groups, priorMetaweb=FALSE){
         dimnames(Pi.array.NA)[[3]] <- g.id
         
         for(i in 1:length(gList)){
-            P.mat[names(alpha_list[[i]]),i] <- alpha_list[[i]]
+            P.mat[colnames(alpha_list[[i]]),i] <- alpha_list[[i]][1,]
             L.array[rownames(L_list[[i]]),colnames(L_list[[i]]),i] <- as.matrix(L_list[[i]][rownames(L_list[[i]]),colnames(L_list[[i]])])
             Pi.array.NA[rownames(Pi_list[[i]]), colnames(Pi_list[[i]]), i] <- as.matrix(Pi_list[[i]][rownames(Pi_list[[i]]),colnames(Pi_list[[i]])])
         }
