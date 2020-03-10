@@ -35,5 +35,4 @@ Marc Ohlmann, Vincent Miele, Stephane Dray, Loic Chalmandrier, Louise O'Connor &
   \code{\link[vegan]{vegan}}
   \code{\link[sna]{sna}}
   \code{\link[statnet]{statnet}}
-  \code{\link[enaR]{enaR}}
 }

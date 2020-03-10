@@ -1,5 +1,5 @@
 d32239bcb673463ab874e80d47fae504 *COPYING
-9c072929eed29be337696ad98e3d4cb5 *DESCRIPTION
+67503ab3093d0572ae8ee2ab2a8c86a4 *DESCRIPTION
 cde35931ec16a1012ac3852bff0e3893 *NAMESPACE
 77c2c83ec2b5ee22e7a4245eda7388c7 *R/chalmandrier.R
 338076f715ed178c6184f59fc8cf220b *R/disPairwise.R
@@ -9,5 +9,5 @@ e00318dcd5ca8a2e1f9d41467b11c41e *R/getMetaweb.R
 871d23f6ee4bf22df3d7ba53b8457aa1 *README.md
 b318df80c21da8d94937f7a834e6e849 *man/disPairwise.Rd
 dde8a3c705435692cb76b873cebaa8ff *man/divPartition.Rd
-5810b310b83a4f72c6949678a47ffc0f *man/econetwork.Rd
+9520ed18fca8593aa2e258ca70e04202 *man/econetwork.Rd
 9d46a50b56d390864d56497f2e0e8874 *man/getMetaweb.Rd
