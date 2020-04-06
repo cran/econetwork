@@ -24,6 +24,7 @@ Maintainer: Vincent Miele <vincent.miele@univ-lyon1.fr>
 }
 \references{
 Marc Ohlmann, Vincent Miele, Stephane Dray, Loic Chalmandrier, Louise O'Connor & Wilfried Thuiller, Diversity indices for ecological networks: a unifying framework using Hill numbers. Ecology Letters (2019) <doi:10.1111/ele.13221>
+Ana M. Martin Gonzalez, Diego P. Vazquez, Rodrigo Ramos-Jiliberto, Sang  Hoon Lee & Vincent Miele, Core-periphery structure in mutualistic networks: an epitaph for nestedness? BiorXiv (2020) <doi:10.1101/2020.04.02.021691>
 }
 \keyword{package}
 \keyword{ecology}
@@ -33,6 +34,4 @@ Marc Ohlmann, Vincent Miele, Stephane Dray, Loic Chalmandrier, Louise O'Connor &
   \code{\link[igraph]{igraph}}
   \code{\link[bipartite]{bipartite}}
   \code{\link[vegan]{vegan}}
-  \code{\link[sna]{sna}}
-  \code{\link[statnet]{statnet}}
 }
