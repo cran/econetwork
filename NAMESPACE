@@ -1,5 +1,6 @@
 import(igraph)
-import(rdiversity)
+#import(rdiversity)
+importFrom("rdiversity","metacommunity","norm_meta_alpha","norm_sub_alpha","norm_meta_beta","meta_gamma")
 import(Matrix.utils)
 import(blockmodels)
 importFrom("stats","as.dist")
