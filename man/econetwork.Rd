@@ -33,5 +33,4 @@ Ana M. Martin Gonzalez, Diego P. Vazquez, Rodrigo Ramos-Jiliberto, Sang  Hoon Le
 \seealso{
   \code{\link[igraph]{igraph}}
   \code{\link[bipartite]{bipartite}}
-  \code{\link[vegan]{vegan}}
 }
