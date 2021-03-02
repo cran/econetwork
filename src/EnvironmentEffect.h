@@ -16,7 +16,7 @@
 */
 
 #ifndef ECONETWORK_ENVIRONMENTEFFECT_H
-#define ECONETWORK_ENVIRONMENTEFFECT__H
+#define ECONETWORK_ENVIRONMENTEFFECT_H
 #include <iostream>
 #include <Eigen/Dense>
 #include <gsl/gsl_vector.h>
@@ -31,21 +31,21 @@ namespace econetwork{
     unsigned int _nbLocations;
     unsigned int _nbSpecies;
     unsigned int _nbCovariates;
-    Eigen::MatrixXd _E; // environment covariates 
-    Eigen::MatrixXd _E2; // square environment covariates 
+    Eigen::MatrixXd _covarE; // environment covariates 
+    Eigen::MatrixXd _covarE2; // square environment covariates 
     // parameters
     Eigen::MatrixXd _a; // coefficients for covariates
     Eigen::MatrixXd _b; // coefficients for square covariates 
     // utilities
     //Eigen::ArrayXXd _prediction;   ==> WOULD BE TOO OFTEN RECOMPYUTED
     //void updatePrediction(){
-    //_prediction = _a*_E.transpose() + _b*_E2.transpose(); //of size _nbSpecies x _nbLocations
+    //_prediction = _a*_covarE.transpose() + _b*_covarE2.transpose(); //of size _nbSpecies x _nbLocations
     //std::cout << "The matrix _prediction is of size " << _prediction.rows() << "x" << _prediction.cols() << std::endl << _prediction << std::endl;
     //}  
   public:
     EnvironmentEffect(unsigned int nbSpecies, unsigned int nbLocations, unsigned int nbCovariates) :
       _nbLocations(nbLocations), _nbSpecies(nbSpecies), _nbCovariates(nbCovariates), 
-      _E(nbLocations,nbCovariates), _E2(nbLocations,nbCovariates),
+      _covarE(nbLocations,nbCovariates), _covarE2(nbLocations,nbCovariates),
       _a(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)),
       _b(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)) //, _prediction(nbSpecies,nbLocations)
     {
@@ -56,24 +56,24 @@ namespace econetwork{
       return(_nbCovariates);
     }
     double prediction(unsigned int i, unsigned int l) const{
-      double p1 = _a.row(i)*_E.row(l).transpose();
-      double p2 = _b.row(i)*_E2.row(l).transpose();
+      double p1 = _a.row(i)*_covarE.row(l).transpose();
+      double p2 = _b.row(i)*_covarE2.row(l).transpose();
       return(p1+p2);
       //return(_prediction(i,l));
     }
     //const Eigen::ArrayXXd& getPrediction() const{
     const Eigen::ArrayXXd getPrediction() const{
-      return(_a*_E.transpose() + _b*_E2.transpose());
+      return(_a*_covarE.transpose() + _b*_covarE2.transpose());
       //return(_prediction);
     }
     void loadEnvironmentData(const double* EnvironmentR){
       const double* ptr = EnvironmentR;
       for(unsigned int k=0; k<_nbCovariates; k++)
 	for(unsigned int l=0; l<_nbLocations; l++){
-	  _E(l,k) = *ptr; // EnvironmentR is supposed to be colwise, i.e. R-like
+	  _covarE(l,k) = *ptr; // EnvironmentR is supposed to be colwise, i.e. R-like
 	  ptr++;
 	}
-      _E2 = _E.cwiseProduct(_E);
+      _covarE2 = _covarE.cwiseProduct(_covarE);
       //updatePrediction();
     }
     void loadCoefficientA(const Eigen::MatrixXd& a){
@@ -84,8 +84,8 @@ namespace econetwork{
       _b = b;
       //updatePrediction();
     }
-    const Eigen::MatrixXd& getE() const{ return(_E);}
-    const Eigen::MatrixXd& getE2() const{ return(_E2);}
+    const Eigen::MatrixXd& getE() const{ return(_covarE);}
+    const Eigen::MatrixXd& getE2() const{ return(_covarE2);}
     Eigen::MatrixXd& getCoefficientA() { return(_a);}
     Eigen::MatrixXd& getCoefficientB() { return(_b);}
   };

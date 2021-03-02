@@ -50,14 +50,14 @@ namespace econetwork{
     const double* ptr = AmetaR;
     for(unsigned int j=0; j<_nbSpecies; j++)
       for(unsigned int i=0; i<_nbSpecies; i++){
-	_Ameta(i,j) = *ptr; // Ameta is supposed to be colwise, i.e. R-like
+	_metaA(i,j) = *ptr; // Ameta is supposed to be colwise, i.e. R-like
 	ptr++;
       }
   }
   
   //////////////////////////////////////////////////////////////
   double EltonModel::simulateX(const Eigen::MatrixXd& Y, bool reinit, bool withY){
-    if(reinit) _X = Y;
+    if(reinit) _presX = Y;
     double logL = 0;
     std::vector<unsigned int> vrange(_nbSpecies,0);
     for(unsigned int i=0; i<_nbSpecies; i++) vrange[i] = i;
@@ -68,19 +68,19 @@ namespace econetwork{
 #pragma omp parallel for
       for(unsigned int l=0; l<_nbLocations; l++){
 	if ((withY?Y(i,l):0)<1){ // not testing equality to 1 with float
-	  double a = _betaAbs(l)*_Ameta.row(i)*(Eigen::VectorXd::Ones(_nbSpecies)-_X.col(l));
-	  double b = _alphaSpecies(i) + _alphaLocations(l) + _peffect->prediction(i,l) + _beta(l)*_Ameta.row(i)*_X.col(l);
+	  double a = _betaAbs(l)*_metaA.row(i)*(Eigen::VectorXd::Ones(_nbSpecies)-_presX.col(l));
+	  double b = _alphaSpecies(i) + _alphaLocations(l) + _peffect->prediction(i,l) + _beta(l)*_metaA.row(i)*_presX.col(l);
 	  double c = (1-(withY?sampling(i,l):0));
 	  double probaabsil = 1/(1+c*exp(b-a));
 	  double probapresil = 1/(exp(a-b)/c+1);
 #ifdef STATICRAND
-	  _X(i,l) = ((staticrand(0,1)<probaabsil)?0:1);
+	  _presX(i,l) = ((staticrand(0,1)<probaabsil)?0:1);
 #else
-	  _X(i,l) = ((R::unif_rand()<probaabsil)?0:1);
+	  _presX(i,l) = ((R::unif_rand()<probaabsil)?0:1);
 #endif
 	  _probaPresence(i,l) = probapresil;
 	} else{
-	  _X(i,l) = 1;
+	  _presX(i,l) = 1;
 	  _probaPresence(i,l) = 1;
 	}
       }
@@ -94,14 +94,14 @@ namespace econetwork{
 #ifdef VERBOSE
       if(k%100==0){
 	cout.precision(4);
-	cout<<"# Y proposed"<<endl<<_X.mean()<<endl;
+	cout<<"# Y proposed"<<endl<<_presX.mean()<<endl;
       }
 #endif
     }
     Eigen::MatrixXd Y =  Eigen::MatrixXd::Zero(_nbSpecies,_nbLocations);
     for(unsigned int i=0; i<_nbSpecies; i++){
       for(unsigned int l=0; l<_nbLocations; l++){
-	if (_X(i,l)==1){
+	if (_presX(i,l)==1){
 #ifdef STATICRAND
 	  if (staticrand(0,1)<sampling(i,l)) Y(i,l)=1;
 #else
@@ -116,7 +116,7 @@ namespace econetwork{
   //////////////////////////////////////////////////////////////
   void EltonModel::updateAlphaBeta(){
     // linking to function for which we search for the minimum
-    Eigen::ArrayXXd weight = (_Ameta*_X).array();
+    Eigen::ArrayXXd weight = (_metaA*_presX).array();
     GSLParams gslparams = {this, &weight};
     gsl_multimin_function_fdf my_func;
     my_func.n = _nbSpecies+3*_nbLocations+2*_nbSpecies*_peffect->nbCovariates();
@@ -232,7 +232,7 @@ namespace econetwork{
 	}
 #pragma omp task depend(out:weightdiff)
 	{
-	  weightdiff = ptrmodel->_Ameta.rowwise().sum().array().replicate(1,ptrmodel->_nbLocations) - *ptrweight;
+	  weightdiff = ptrmodel->_metaA.rowwise().sum().array().replicate(1,ptrmodel->_nbLocations) - *ptrweight;
 	}
       }
     }
@@ -389,7 +389,7 @@ namespace econetwork{
     Eigen::ArrayXXd arrAlpha = _alphaSpecies.array().replicate(1,_nbLocations) + _alphaLocations.array().transpose().replicate(_nbSpecies,1) + _peffect->getPrediction();
     Eigen::ArrayXXd arrBeta = _beta.array().transpose().replicate(_nbSpecies,1);
     Eigen::ArrayXXd arrBetaAbs = _betaAbs.array().transpose().replicate(_nbSpecies,1);
-    Eigen::ArrayXXd weightdiff = _Ameta.rowwise().sum().array().replicate(1,_nbLocations) - weight;
+    Eigen::ArrayXXd weightdiff = _metaA.rowwise().sum().array().replicate(1,_nbLocations) - weight;
     Eigen::ArrayXXd denom = exp(weightdiff*arrBetaAbs) + exp(arrAlpha+weight*arrBeta);
     auto arrQ2 = (1-_probaPresence)*arrBetaAbs*weightdiff
       + _probaPresence*(arrAlpha+weight*arrBeta)

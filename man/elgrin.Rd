@@ -44,10 +44,14 @@ Authors: Vincent Miele
 Maintainer: Vincent Miele <vincent.miele@univ-lyon1.fr>
 }
 \examples{
-\dontrun{
-data(virtualComCompetition)
+\dontrun{data(virtualComCompetition)
 vcom <- virtualComCompetition
 result <- elgrin(vcom$presence, vcom$metaweb, vcom$environmentvar)
-print(result)
+
+## checking results
+str(result)
+plot(result$betaPres, result$betaAbs, xlab="Co-presence", ylab="Co-absence")
+abline(h=0, col=2)
+abline(v=0, col=2)
 }
 }

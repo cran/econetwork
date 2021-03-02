@@ -50,8 +50,8 @@ namespace econetwork{
     // (un)observed data
     unsigned int _nbLocations;
     unsigned int _nbSpecies;
-    Eigen::MatrixXd _Ameta; // species interactions, possibly weighted
-    Eigen::MatrixXd _X; // real presence/absence (stored in double to use Eigen operations)
+    Eigen::MatrixXd _metaA; // species interactions, possibly weighted
+    Eigen::MatrixXd _presX; // real presence/absence (stored in double to use Eigen operations)
     // parameters
     Eigen::VectorXd _alphaSpecies; // species ubiquity (the greater, the higher the number of locations the species is present)
     Eigen::VectorXd _alphaLocations; // locations attractivty (the greater, the higher the number of species is expected in a location)
@@ -69,8 +69,8 @@ namespace econetwork{
     EltonModel(unsigned int nbSpecies, unsigned int nbLocations,
 	       double alphainit, double betainit, double samplinginit,
 	       SamplingType samplingType) :
-      _nbLocations(nbLocations), _nbSpecies(nbSpecies), _Ameta(Eigen::MatrixXd(nbSpecies,nbSpecies)),
-      _X(nbSpecies,nbLocations),
+      _nbLocations(nbLocations), _nbSpecies(nbSpecies), _metaA(Eigen::MatrixXd(nbSpecies,nbSpecies)),
+      _presX(nbSpecies,nbLocations),
       _alphaSpecies(Eigen::VectorXd::Constant(nbSpecies,alphainit/2)),
       _alphaLocations(Eigen::VectorXd::Constant(nbLocations,alphainit/2)),
       _beta(Eigen::VectorXd::Constant(nbLocations,betainit)),
@@ -104,13 +104,13 @@ namespace econetwork{
     // if withY=false, Y and sampling are not used
     double simulateX(const Eigen::MatrixXd& Y, bool reinit=false, bool withY=true);
     void updateAlphaBeta();
-    const Eigen::MatrixXd& getX() const {return(_X);}
+    const Eigen::MatrixXd& getX() const {return(_presX);}
     const Eigen::VectorXd& getAlphaSpecies() const {return(_alphaSpecies);}
     const Eigen::VectorXd& getAlphaLocations() const {return(_alphaLocations);}
     const Eigen::VectorXd& getBeta() const {return(_beta);}
     const Eigen::VectorXd& getBetaAbs() const {return(_betaAbs);}
     double getQ2(){
-      Eigen::ArrayXXd weight = (_Ameta*_X).array();
+      Eigen::ArrayXXd weight = (_metaA*_presX).array();
       return(computeQ2(weight));    
     }
     double sampling(unsigned int i, unsigned int s){
