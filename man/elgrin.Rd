@@ -46,10 +46,10 @@ Maintainer: Vincent Miele <vincent.miele@univ-lyon1.fr>
 \examples{
 \dontrun{data(virtualComCompetition)
 vcom <- virtualComCompetition
-result <- elgrin(vcom$presence, vcom$metaweb, vcom$environmentvar)
 
-## checking results
+result <- elgrin(vcom$presence, vcom$metaweb, vcom$environmentvar)
 str(result)
+
 plot(result$betaPres, result$betaAbs, xlab="Co-presence", ylab="Co-absence")
 abline(h=0, col=2)
 abline(v=0, col=2)

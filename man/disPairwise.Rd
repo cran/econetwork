@@ -23,7 +23,7 @@ disPairwise(gList, groups=NULL, eta=1,
   correspond to the nodes present in each element of \code{gList}}
 }
 \value{
-  Return a \code{matrix} whose elements are the pairwise dissimilarities. 
+  Return a \code{dist} object whose elements are the pairwise dissimilarities. 
 }
 \references{
 Marc Ohlmann, Vincent Miele, Stephane Dray, Loic Chalmandrier, Louise O'Connor & Wilfried Thuiller, Diversity indices for ecological networks: a unifying framework using Hill numbers. Ecology Letters (2019) <doi:10.1111/ele.13221>

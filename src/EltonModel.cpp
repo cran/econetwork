@@ -4,8 +4,7 @@
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
 * the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
+* (at your option) any later version.*
 * This program is distributed in the hope that it will be useful,
 * but WITHOUT ANY WARRANTY; without even the implied warranty of
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -20,7 +19,6 @@
 #include <gsl/gsl_multimin.h>
 #include <gsl/gsl_multiroots.h>
 #include <Rcpp.h>
-
 
 namespace econetwork{
   using namespace std;
@@ -152,17 +150,35 @@ namespace econetwork{
     status = gsl_multimin_fdfminimizer_set(solver, &my_func, x, initstepsize, tol);
 #ifdef VERBOSE
     printf("status (init) = %s\n", gsl_strerror(status));
-    cout.precision(2);
+    cout<<"initial value: "<<solver->f<<endl;
 #endif
     unsigned int iter = 0;
     do{
       iter++;
       status = gsl_multimin_fdfminimizer_iterate(solver);
-      //printf("status = %s\n", gsl_strerror(status)); 
+#ifdef VERBOSE
+      cout.precision(15);
+      //if(iter%10==1){
+	cout<<"current value: "<<solver->f<<endl;
+	printf("status = %s\n", gsl_strerror(status));
+	//}
+      cout.precision(4);
+#endif
+      for(unsigned int i=0; i<_nbSpecies; i++)
+	for(unsigned int k=0; k<_peffect->nbCovariates(); k++){
+	  double bik = gsl_vector_get(solver->x,_nbSpecies+3*_nbLocations+_nbSpecies*_peffect->nbCovariates()+i*_peffect->nbCovariates()+k);
+	  if(bik>0){
+	    gsl_vector_set(solver->x,_nbSpecies+3*_nbLocations+_nbSpecies*_peffect->nbCovariates()+i*_peffect->nbCovariates()+k,0.);
+	  }
+	}
       if (status)   /* check if solver is stuck */
-	break;	
+	break;
       status = gsl_multimin_test_gradient(solver->gradient, 1e-3);
-    } while(status == GSL_CONTINUE && iter < 1000);
+    } while(status == GSL_CONTINUE && iter < 100);
+
+
+    // ### CHANGER 10 en 10000 ### !!!!!
+    
     // copying result
     for(unsigned int i=0; i<_nbSpecies; i++)
       _alphaSpecies(i) = gsl_vector_get(solver->x,i);
@@ -180,7 +196,11 @@ namespace econetwork{
 	_peffect->getCoefficientB()(i,k) = gsl_vector_get(solver->x,_nbSpecies+3*_nbLocations+_nbSpecies*_peffect->nbCovariates()+i*_peffect->nbCovariates()+k);
     // freeing
 #ifdef VERBOSE
+    cout.precision(6);
+    cout<<"final value: "<<solver->f<<endl;
     printf("status (final) = %s\n", gsl_strerror(status));
+    cout<<"after "<<iter<<" iterations "<<endl;
+    cout.precision(4);
 #endif
     gsl_multimin_fdfminimizer_free(solver);
     gsl_vector_free(x);
@@ -363,7 +383,10 @@ namespace econetwork{
 	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+i*ptrmodel->_peffect->nbCovariates()+k,-derivCoeffA(i,k));
       for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
 	for(unsigned int k=0; k<ptrmodel->_peffect->nbCovariates(); k++)
+	  //if(ptrmodel->_peffect->getCoefficientB()(i,k)<0)
 	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+ptrmodel->_nbSpecies*ptrmodel->_peffect->nbCovariates()+i*ptrmodel->_peffect->nbCovariates()+k,-derivCoeffB(i,k));
+      //else
+      //gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+ptrmodel->_nbSpecies*ptrmodel->_peffect->nbCovariates()+i*ptrmodel->_peffect->nbCovariates()+k,0.); // FORCING NULL	when Bik>=0 (assume initial value are <0)        
     }
     // Reinitializing       
     ptrmodel->_alphaSpecies = alphaSpeciesBack;  

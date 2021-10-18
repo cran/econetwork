@@ -47,7 +47,7 @@ namespace econetwork{
       _nbLocations(nbLocations), _nbSpecies(nbSpecies), _nbCovariates(nbCovariates), 
       _covarE(nbLocations,nbCovariates), _covarE2(nbLocations,nbCovariates),
       _a(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)),
-      _b(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)) //, _prediction(nbSpecies,nbLocations)
+      _b(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,-0.1)) //, _prediction(nbSpecies,nbLocations)
     {
       //updatePrediction();
     }
