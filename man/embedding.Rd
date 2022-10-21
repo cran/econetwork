@@ -114,6 +114,7 @@ for(i in (6:10)){
 names(gList) = LETTERS[1:10]
 
 # Computing different embeddings and
+usermfrow <- par()$mfrow
 par(mfrow=c(2,2))
 
 embd <- embedding(gList, method="metric2vec")
@@ -135,4 +136,6 @@ embd <- embedding(gList, method="shortestpath2vec", groups)
 pca <- prcomp(embd, rank=2)$x
 plot(pca, main="shortestpath2vec_group")
 text(x=pca[,1], y=pca[,2], labels=rownames(embd), pos=2, col=c(rep("blue",5),rep("red",5)))
+
+par(mfrow=usermfrow)
 }

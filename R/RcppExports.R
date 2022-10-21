@@ -5,3 +5,7 @@ elgrincore <- function(YR, AmetaR, EnvironmentR, nbthreads = 1L) {
     .Call(`_econetwork_elgrincore`, YR, AmetaR, EnvironmentR, nbthreads)
 }
 
+elgrinsimcore <- function(AmetaR, EnvironmentR, aR, alR, bR, cR, betaR, betaabsR, compatR, nbthreads = 1L) {
+    .Call(`_econetwork_elgrinsimcore`, AmetaR, EnvironmentR, aR, alR, bR, cR, betaR, betaabsR, compatR, nbthreads)
+}
+

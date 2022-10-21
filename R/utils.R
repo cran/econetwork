@@ -22,7 +22,7 @@ sbmParams <- function(g, groups=NULL){
     
     alpha.vec <- V(g)$ab #abundance of the groups of the groups
     names(alpha.vec) <- V(g)$name
-    alpha.vec = t(as.matrix(aggregate.Matrix(alpha.vec,groups,fun = 'sum')))
+    alpha.vec = t(as.matrix(sapply(split(alpha.vec,groups),sum)))
     
     if(is.null(E(g)$weight)){#get the (weighted adjacency matrix)
         adj.mat <- get.adjacency(g)
@@ -30,7 +30,15 @@ sbmParams <- function(g, groups=NULL){
         adj.mat <- get.adjacency(g,attr = "weight")/max(E(g)$weight)
     }
     adj.mat.w <- adj.mat*V(g)$ab%*%t(V(g)$ab) #weight by species abundances (i.e. matrix of L_{ql} in the paper)
-    l.mat<-as.matrix(aggregate.Matrix(t(as.matrix(aggregate.Matrix(adj.mat.w,groups,fun='sum'))),groups,fun='sum'))[colnames(alpha.vec),colnames(alpha.vec)] #aggregate the adjacency matrix at a group level
+    l.mat <- matrix(0, length(alpha.vec),length(alpha.vec))
+    colnames(l.mat) <- rownames(l.mat) <- colnames(alpha.vec)
+    Q <- length(colnames(alpha.vec))
+    for (q in 1:Q){
+        for (l in 1:Q){
+            l.mat[q,l] <- sum(adj.mat.w[which(groups==colnames(alpha.vec)[q]),
+                                        which(groups==colnames(alpha.vec)[l])])
+        }
+    }
     pi.mat<-l.mat/(t(alpha.vec)%*%alpha.vec) #link probability matrix
     
     return(list(alpha=alpha.vec,

@@ -4,7 +4,8 @@
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
 * the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.*
+* (at your option) any later version.
+*
 * This program is distributed in the hope that it will be useful,
 * but WITHOUT ANY WARRANTY; without even the implied warranty of
 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -54,6 +55,35 @@ namespace econetwork{
   }
   
   //////////////////////////////////////////////////////////////
+  void EltonModel::computeCompatibility(double extra){
+    for(unsigned int i=0; i<_nbSpecies; i++){
+      Eigen::VectorXd mini = Eigen::VectorXd::Constant(_peffect->nbCovariates(),1e16);
+      Eigen::VectorXd maxi = Eigen::VectorXd::Constant(_peffect->nbCovariates(),-1e16);      
+      for(unsigned int l=0; l<_nbLocations; l++){
+	if(_presX(i,l)>0){ // using cwiseProduct, min/max can be 0. Filtering
+	  for(unsigned int k=0; k<_peffect->nbCovariates(); k++){
+	    if(_peffect->getE()(l,k)>maxi[k]) maxi[k] = _peffect->getE()(l,k);
+	    if(_peffect->getE()(l,k)<mini(k)) mini[k] = _peffect->getE()(l,k);
+	  }
+	}
+      }
+      for(unsigned int k=0; k<_peffect->nbCovariates(); k++){
+	auto lag = maxi[k]-mini[k];
+	maxi[k] += lag*extra;
+	mini[k] -= lag*extra;
+      }
+      for(unsigned int l=0; l<_nbLocations; l++){
+	for(unsigned int k=0; k<_peffect->nbCovariates(); k++){
+	  if(_peffect->getE()(l,k)>maxi[k])
+	    _compat(i,l) = 0;
+	  if(_peffect->getE()(l,k)<mini[k])
+	    _compat(i,l) = 0;
+	}
+      }
+    }
+  }
+  
+  //////////////////////////////////////////////////////////////
   double EltonModel::simulateX(const Eigen::MatrixXd& Y, bool reinit, bool withY){
     if(reinit) _presX = Y;
     double logL = 0;
@@ -65,24 +95,29 @@ namespace econetwork{
       //for(unsigned int i=0; i<_nbSpecies; i++){
 #pragma omp parallel for
       for(unsigned int l=0; l<_nbLocations; l++){
-	if ((withY?Y(i,l):0)<1){ // not testing equality to 1 with float
-	  double a = _betaAbs(l)*_metaA.row(i)*(Eigen::VectorXd::Ones(_nbSpecies)-_presX.col(l));
-	  double b = _alphaSpecies(i) + _alphaLocations(l) + _peffect->prediction(i,l) + _beta(l)*_metaA.row(i)*_presX.col(l);
-	  double c = (1-(withY?sampling(i,l):0));
-	  double probaabsil = 1/(1+c*exp(b-a));
-	  double probapresil = 1/(exp(a-b)/c+1);
+	if(_compat(i,l)>0){
+	    if ((withY?Y(i,l):0)<1){ // not testing equality to 1 with float
+	      double a = _betaAbs(l)*_metaA.row(i)*( (Eigen::VectorXd::Ones(_nbSpecies)-_presX.col(l)).array() * _compat.col(l) ).matrix();
+	      double b = _alphaSpecies(i) + _alphaLocations(l) + _peffect->prediction(i,l) + _beta(l)*_metaA.row(i)*_presX.col(l);
+	      double c = (1-(withY?sampling(i,l):0));
+	      double probaabsil = 1/(1+c*exp(b-a));
+	      double probapresil = 1/(exp(a-b)/c+1);
 #ifdef STATICRAND
-	  _presX(i,l) = ((staticrand(0,1)<probaabsil)?0:1);
+	      _presX(i,l) = ((staticrand(0,1)<probaabsil)?0:1);
 #else
-	  _presX(i,l) = ((R::unif_rand()<probaabsil)?0:1);
+	      _presX(i,l) = ((R::unif_rand()<probaabsil)?0:1);
 #endif
-	  _probaPresence(i,l) = probapresil;
-	} else{
-	  _presX(i,l) = 1;
-	  _probaPresence(i,l) = 1;
+	      _probaPresence(i,l) = probapresil;
+	    } else{
+	      _presX(i,l) = 1;
+	      _probaPresence(i,l) = 1;
+	    }
 	}
       }
     }
+    // updating compatibility
+    if(withY)
+      computeCompatibility(0.);
     return(logL);
   }
 
@@ -108,14 +143,16 @@ namespace econetwork{
 	}
       }
     }
+    // updating compatibility
+    computeCompatibility(0.);
     return(Y);
   }
      
   //////////////////////////////////////////////////////////////
   void EltonModel::updateAlphaBeta(){
     // linking to function for which we search for the minimum
-    Eigen::ArrayXXd weight = (_metaA*_presX).array();
-    GSLParams gslparams = {this, &weight};
+    _weight = (_metaA*_presX).array();
+    GSLParams gslparams = {this, &_weight};
     gsl_multimin_function_fdf my_func;
     my_func.n = _nbSpecies+3*_nbLocations+2*_nbSpecies*_peffect->nbCovariates();
     gsl_vector *x = gsl_vector_alloc(my_func.n);
@@ -150,35 +187,29 @@ namespace econetwork{
     status = gsl_multimin_fdfminimizer_set(solver, &my_func, x, initstepsize, tol);
 #ifdef VERBOSE
     printf("status (init) = %s\n", gsl_strerror(status));
+    cout.precision(6);
     cout<<"initial value: "<<solver->f<<endl;
+    cout.precision(4);
 #endif
     unsigned int iter = 0;
+    double prevf = 1e9;
+    bool convergence = false;
     do{
       iter++;
       status = gsl_multimin_fdfminimizer_iterate(solver);
-#ifdef VERBOSE
-      cout.precision(15);
-      //if(iter%10==1){
-	cout<<"current value: "<<solver->f<<endl;
-	printf("status = %s\n", gsl_strerror(status));
-	//}
-      cout.precision(4);
-#endif
-      for(unsigned int i=0; i<_nbSpecies; i++)
-	for(unsigned int k=0; k<_peffect->nbCovariates(); k++){
-	  double bik = gsl_vector_get(solver->x,_nbSpecies+3*_nbLocations+_nbSpecies*_peffect->nbCovariates()+i*_peffect->nbCovariates()+k);
-	  if(bik>0){
-	    gsl_vector_set(solver->x,_nbSpecies+3*_nbLocations+_nbSpecies*_peffect->nbCovariates()+i*_peffect->nbCovariates()+k,0.);
-	  }
-	}
+      //printf("status = %s\n", gsl_strerror(status));
       if (status)   /* check if solver is stuck */
-	break;
-      status = gsl_multimin_test_gradient(solver->gradient, 1e-3);
-    } while(status == GSL_CONTINUE && iter < 100);
-
-
-    // ### CHANGER 10 en 10000 ### !!!!!
-    
+	break;	
+#ifdef VERBOSE
+      if(iter%10==0){
+	printf ("%5d %10.5f\n", iter, solver->f);
+      } 
+#endif
+      //gsl_vector_fprintf(stdout, solver->gradient, "%g");    
+      status = gsl_multimin_test_gradient(solver->gradient, 1e-2);
+      convergence = ((prevf-solver->f)/prevf < 1e-3);
+      prevf = solver->f;
+    } while(status == GSL_CONTINUE && iter < 500 && !convergence);
     // copying result
     for(unsigned int i=0; i<_nbSpecies; i++)
       _alphaSpecies(i) = gsl_vector_get(solver->x,i);
@@ -201,6 +232,7 @@ namespace econetwork{
     printf("status (final) = %s\n", gsl_strerror(status));
     cout<<"after "<<iter<<" iterations "<<endl;
     cout.precision(4);
+    cerr<<"After "<<iter<<" iterations, objective: "<<computeQ2(_weight)<<endl;; 
 #endif
     gsl_multimin_fdfminimizer_free(solver);
     gsl_vector_free(x);
@@ -252,24 +284,25 @@ namespace econetwork{
 	}
 #pragma omp task depend(out:weightdiff)
 	{
-	  weightdiff = ptrmodel->_metaA.rowwise().sum().array().replicate(1,ptrmodel->_nbLocations) - *ptrweight;
+	  weightdiff = (ptrmodel->_metaA*(((1-ptrmodel->_probaPresence)*ptrmodel->_compat).matrix())).array();
+	  //weightdiff = ptrmodel->_metaA.rowwise().sum().array().replicate(1,ptrmodel->_nbLocations) - *ptrweight;
 	}
       }
     }
     // Computing Q2
     if(f){
-      Eigen::ArrayXXd expoa, expob, arrQ2a, arrQ2b;
+      Eigen::ArrayXXd a, b, cmax, arrQ2a, arrQ2b;
 #pragma omp parallel
       {
 #pragma omp single nowait
 	{
-#pragma omp task depend(in:arrBetaAbs,weightdiff) depend(out:expoa)
+#pragma omp task depend(in:arrBetaAbs,weightdiff) depend(out:a)
 	  {
-	    expoa = exp(weightdiff*arrBetaAbs);
+	    a = weightdiff*arrBetaAbs;
 	  }
-#pragma omp task depend(in:arrAlpha,arrBeta) depend(out:expob)
+#pragma omp task depend(in:arrAlpha,arrBeta) depend(out:b)
 	  {
-	    expob = exp(arrAlpha+(*ptrweight)*arrBeta);
+	    b = arrAlpha+(*ptrweight)*arrBeta;
 	  }
 #pragma omp task depend(in:arrBetaAbs,weightdiff) depend(out:arrQ2a)
 	  {
@@ -279,9 +312,16 @@ namespace econetwork{
 	  {
 	    arrQ2b = (ptrmodel->_probaPresence)*(arrAlpha+(*ptrweight)*arrBeta);
 	  }
+	  
+#pragma omp task depend(in:a,b) depend(out:arrQ2b)
+	  {
+	    cmax = a.cwiseMax(b);
+	  }
 	}
       }
-      auto arrQ2 = arrQ2a + arrQ2b - log(expoa+expob);
+      // log-sum trick https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
+      Eigen::ArrayXXd arrQ2 = arrQ2a + arrQ2b - (cmax+log(exp(a-cmax)+exp(b-cmax))); // i.e. log(expoa+expob);
+      arrQ2 = arrQ2*ptrmodel->_compat;
       // Output opposite to minimize -Q2
       auto Q2 = (arrQ2.rowwise().sum()).sum();
       *f = -Q2;
@@ -290,7 +330,8 @@ namespace econetwork{
     if(df){
       auto c = weightdiff;
       auto d = *ptrweight;
-      Eigen::ArrayXXd a, b, derivAlphas, derivAlphal, term1a, term2a, term1b, term2b, derivBeta, derivBetaAbs;
+      Eigen::ArrayXXd a, b, cmax, expaoversum, expboversum, derivAlphas, derivAlphal, term1a, term2a, term1b, term2b, derivBeta, derivBetaAbs;
+      //Eigen::ArrayXXd tmp, derivCoeffA, derivCoeffB;
       Eigen::MatrixXd tmp, derivCoeffA, derivCoeffB;
 #pragma omp parallel num_threads(4)
       {
@@ -304,69 +345,84 @@ namespace econetwork{
 	  {
 	    b = arrAlpha+*ptrweight*arrBeta;
 	  }
-#pragma omp task depend(in:a,b) depend(out:derivAlphas)  //task1
-	  { 
-	    derivAlphas = (ptrmodel->_probaPresence - 1/(exp(a-b)+1)).rowwise().sum();
+#pragma omp task depend(in:a,b) depend(out:cmax)
+	  {
+	    cmax = a.cwiseMax(b);
 	  }
-#pragma omp task depend(in:a,b) depend(out:derivAlphal)  //task2
-	  { 
-	    derivAlphal = (ptrmodel->_probaPresence - 1/(exp(a-b)+1)).colwise().sum();
+#pragma omp task depend(in:a,b,cmax) depend(out:expaoversum)
+	  {
+	    //auto expaoversum = exp(a) / (exp(a)+exp(b));
+	    //expaoversum = 1 / (1+exp(b-a));
+	    expaoversum = exp( a - (cmax+log(exp(a-cmax)+exp(b-cmax))) );
 	  }
-// #pragma omp task depend(out:term1)  //task3
-// 	  { 
-// 	    term1 = (1-ptrmodel->_probaPresence)*weightdiff + ptrmodel->_probaPresence*(*ptrweight);
-// 	  }  
-#pragma omp task depend(out:term1a)  //task3
+#pragma omp task depend(in:a,b,cmax) depend(out:expboversum)
+	  {
+	    expboversum = exp( b - (cmax+log(exp(a-cmax)+exp(b-cmax))) );
+	  }
+#pragma omp task depend(in:expboversum) depend(out:derivAlphas)
+	  { 
+	    //derivAlphas = ((ptrmodel->_probaPresence - 1/(exp(a-b)+1))*ptrmodel->_compat).rowwise().sum();
+	    derivAlphas = ((ptrmodel->_probaPresence - expboversum)*ptrmodel->_compat).rowwise().sum();
+	  }
+#pragma omp task depend(in:expboversum) depend(out:derivAlphal)
+	  {
+	    //derivAlphal = ((ptrmodel->_probaPresence - 1/(exp(a-b)+1))*ptrmodel->_compat).colwise().sum();
+	    derivAlphal = ((ptrmodel->_probaPresence - expboversum)*ptrmodel->_compat).colwise().sum();
+	  }
+#pragma omp task depend(out:term1a)
 	  { 
 	    term1a = (1-ptrmodel->_probaPresence)*weightdiff;
 	  }
-#pragma omp task depend(out:term1b)  //task3
+#pragma omp task depend(out:term1b)
 	  { 
 	    term1b = ptrmodel->_probaPresence*(*ptrweight);
 	  }
-// #pragma omp task depend(in:a,b,c,d) depend(out:term2)  //task4
-// 	  { 
-// 	    term2 = c/(1+exp(b-a)) + d/(exp(a-b)+1);
-// 	  }
-#pragma omp task depend(in:a,b,c,d) depend(out:term2a)  //task4
+#pragma omp task depend(in:c,expaoversum) depend(out:term2a)
 	  { 
-	    term2a = c/(1+exp(b-a));
+	    //term2a = c/(1+exp(b-a));
+	    term2a = c*expaoversum; // /(1+exp(b-a));
 	  }
-#pragma omp task depend(in:a,b,c,d) depend(out:term2b)  //task4
-	  { 
-	    term2b = d/(exp(a-b)+1);
-	  }
-// #pragma omp task depend(in:term1,term2) depend(out:derivBeta)  //task5
-// 	  {
-// 	    derivBeta = (term1-term2).colwise().sum();
-// 	  }
-#pragma omp task depend(in:term1b,term2b) depend(out:derivBeta)  //task5
+#pragma omp task depend(in:d,expboversum) depend(out:term2b)
 	  {
-	    derivBeta = (term1b-term2b).colwise().sum();
+	    //term2b = d/(exp(a-b)+1);
+	    term2b = d*expboversum; // /(exp(a-b)+1);
 	  }
-#pragma omp task depend(in:term1a,term2a) depend(out:derivBetaAbs)  //task5
+#pragma omp task depend(in:term1b,term2b) depend(out:derivBeta)
 	  {
-	    derivBetaAbs = (term1a-term2a).colwise().sum();
+	    derivBeta = ((term1b-term2b)*ptrmodel->_compat).colwise().sum();
 	  }
-#pragma omp task depend(in:a,b) depend(out:tmp)  //task6
+#pragma omp task depend(in:term1a,term2a) depend(out:derivBetaAbs)
 	  {
-	    tmp = (ptrmodel->_probaPresence - 1/(exp(a-b)+1)).matrix();
+	    derivBetaAbs = ((term1a-term2a)*ptrmodel->_compat).colwise().sum();
 	  }
-#pragma omp task depend(in:tmp) depend(out:derivCoeffA)  //task7
+#pragma omp task depend(in:a,b,expboversum) depend(out:tmp)
+	  {
+	    tmp = ((ptrmodel->_probaPresence - expboversum)*ptrmodel->_compat).matrix();
+	  }
+#pragma omp task depend(in:tmp) depend(out:derivCoeffA)
 	  {
 	    derivCoeffA = tmp * ptrmodel->_peffect->getE();
 	  }
-#pragma omp task depend(in:tmp) depend(out:derivCoeffB)  //task8
+#pragma omp task depend(in:tmp) depend(out:derivCoeffB)
 	  {
 	    derivCoeffB = tmp * ptrmodel->_peffect->getE2();
 	  }
 	}
       }
       // Output the derivative opposite to minimize -Q2
+      //#define FIXEDALPHA
+#ifdef FIXEDALPHA
       for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
 	gsl_vector_set(df,i,-derivAlphas(i)); 
       for(unsigned int l=0; l<ptrmodel->_nbLocations; l++)
 	gsl_vector_set(df,ptrmodel->_nbSpecies+l,-derivAlphal(l));
+#else
+      for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
+	gsl_vector_set(df,i,-derivAlphas(i)); 
+      for(unsigned int l=0; l<ptrmodel->_nbLocations; l++)
+	gsl_vector_set(df,ptrmodel->_nbSpecies+l,-derivAlphal(l));
+#endif
+      //#define FIXEDBETA
 #ifdef FIXEDBETA
       for(unsigned int l=0; l<ptrmodel->_nbLocations; l++){
 	gsl_vector_set(df,ptrmodel->_nbSpecies+ptrmodel->_nbLocations+l,0);
@@ -378,15 +434,22 @@ namespace econetwork{
 	gsl_vector_set(df,ptrmodel->_nbSpecies+2*ptrmodel->_nbLocations+l,-derivBetaAbs(l));
       }
 #endif
+      //#define NOENV
+#ifdef NOENV
+      for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
+	for(unsigned int k=0; k<ptrmodel->_peffect->nbCovariates(); k++)
+	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+i*ptrmodel->_peffect->nbCovariates()+k,0);
+      for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
+	for(unsigned int k=0; k<ptrmodel->_peffect->nbCovariates(); k++)
+	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+ptrmodel->_nbSpecies*ptrmodel->_peffect->nbCovariates()+i*ptrmodel->_peffect->nbCovariates()+k,0);
+#else
       for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
 	for(unsigned int k=0; k<ptrmodel->_peffect->nbCovariates(); k++)
 	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+i*ptrmodel->_peffect->nbCovariates()+k,-derivCoeffA(i,k));
       for(unsigned int i=0; i<ptrmodel->_nbSpecies; i++)
 	for(unsigned int k=0; k<ptrmodel->_peffect->nbCovariates(); k++)
-	  //if(ptrmodel->_peffect->getCoefficientB()(i,k)<0)
 	  gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+ptrmodel->_nbSpecies*ptrmodel->_peffect->nbCovariates()+i*ptrmodel->_peffect->nbCovariates()+k,-derivCoeffB(i,k));
-      //else
-      //gsl_vector_set(df,ptrmodel->_nbSpecies+3*ptrmodel->_nbLocations+ptrmodel->_nbSpecies*ptrmodel->_peffect->nbCovariates()+i*ptrmodel->_peffect->nbCovariates()+k,0.); // FORCING NULL	when Bik>=0 (assume initial value are <0)        
+#endif
     }
     // Reinitializing       
     ptrmodel->_alphaSpecies = alphaSpeciesBack;  
@@ -412,11 +475,15 @@ namespace econetwork{
     Eigen::ArrayXXd arrAlpha = _alphaSpecies.array().replicate(1,_nbLocations) + _alphaLocations.array().transpose().replicate(_nbSpecies,1) + _peffect->getPrediction();
     Eigen::ArrayXXd arrBeta = _beta.array().transpose().replicate(_nbSpecies,1);
     Eigen::ArrayXXd arrBetaAbs = _betaAbs.array().transpose().replicate(_nbSpecies,1);
-    Eigen::ArrayXXd weightdiff = _metaA.rowwise().sum().array().replicate(1,_nbLocations) - weight;
+    Eigen::ArrayXXd weightdiff = (_metaA*(((1-_probaPresence)*_compat).matrix())).array();
     Eigen::ArrayXXd denom = exp(weightdiff*arrBetaAbs) + exp(arrAlpha+weight*arrBeta);
-    auto arrQ2 = (1-_probaPresence)*arrBetaAbs*weightdiff
+    Eigen::ArrayXXd a = weightdiff*arrBetaAbs;
+    Eigen::ArrayXXd b = arrAlpha+weight*arrBeta;
+    auto cmax = a.cwiseMax(b);
+    Eigen::ArrayXXd arrQ2 = (1-_probaPresence)*arrBetaAbs*weightdiff
       + _probaPresence*(arrAlpha+weight*arrBeta)
-      - log(denom);
+      - (cmax+log(exp(a-cmax)+exp(b-cmax)));
+    arrQ2 = arrQ2*_compat;
     return((arrQ2.rowwise().sum()).sum());
   }
   

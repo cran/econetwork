@@ -42,7 +42,7 @@ Maintainer: Wilfried Thuiller <wilfried.thuiller@univ-grenoble-alpes.fr>
 # Generating a set of Erdos-Renyi graphs and give node names.
 library(econetwork)
 library(igraph)
-nbGraph <- 10
+nbGraph <- 3
 gList <- c()
 n <- 57 # number of nodes of each graph
 C <- 0.1  # connectance of each graph

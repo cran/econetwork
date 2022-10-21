@@ -47,7 +47,7 @@ namespace econetwork{
       _nbLocations(nbLocations), _nbSpecies(nbSpecies), _nbCovariates(nbCovariates), 
       _covarE(nbLocations,nbCovariates), _covarE2(nbLocations,nbCovariates),
       _a(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)),
-      _b(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,-0.1)) //, _prediction(nbSpecies,nbLocations)
+      _b(Eigen::MatrixXd::Constant(nbSpecies,nbCovariates,0.)) //, _prediction(nbSpecies,nbLocations)
     {
       //updatePrediction();
     }
@@ -59,9 +59,7 @@ namespace econetwork{
       double p1 = _a.row(i)*_covarE.row(l).transpose();
       double p2 = _b.row(i)*_covarE2.row(l).transpose();
       return(p1+p2);
-      //return(_prediction(i,l));
     }
-    //const Eigen::ArrayXXd& getPrediction() const{
     const Eigen::ArrayXXd getPrediction() const{
       return(_a*_covarE.transpose() + _b*_covarE2.transpose());
       //return(_prediction);

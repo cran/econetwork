@@ -9,9 +9,11 @@
 
 /* .Call calls */
 extern SEXP _econetwork_elgrincore(SEXP, SEXP, SEXP, SEXP);
+extern SEXP _econetwork_elgrinsimcore(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
     {"_econetwork_elgrincore", (DL_FUNC) &_econetwork_elgrincore, 4},
+    {"_econetwork_elgrinsimcore", (DL_FUNC) &_econetwork_elgrinsimcore, 10},
     {NULL, NULL, 0}
 };
 

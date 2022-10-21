@@ -25,26 +25,27 @@ elgrin(presence, metaweb, environmentvar, ncores=1)
 }
 \value{
 \code{elgrin} returns an object of class \code{list} with the following components:
-\item{a}{A \code{vector} of species prevalence.}
-\item{al}{A \code{vector} of richness capacity (or expected number of
-  species) at each location.}
+\item{a}{A \code{vector} of species intercepts.}
+\item{al}{A \code{vector} of location intercepts.}
 \item{b}{A \code{matrix} of linear environmental parameters.}
 \item{c}{A \code{matrix} of quadratic environmental parameters. }
 \item{betaPres}{A \code{vector} of co-presence strength (or avoidance when <0)  at each location.}
 \item{betaAbs}{A \code{vector} of co-absence strength (or avoidance when <0) at each location.}
+\item{compat}{A \code{matrix} with niche compatibility of species (rows) at
+    different locations (columns), coded in 0/1 format (1 for compatibility)..}
 }
 \references{
 Vincent Miele, Catherine Matias, Marc Ohlmann, Giovanni Poggiato, St
 ephane Dray and Wilfried Thuiller, Quantifying the overall effect of
 biotic1interactions on species communities along2environmental
-gradients, submitted.
+gradients, arXiv <doi:10.48550/arXiv.2103.10433>
 }
 \author{
 Authors: Vincent Miele
 Maintainer: Vincent Miele <vincent.miele@univ-lyon1.fr>
 }
 \examples{
-\dontrun{data(virtualComCompetition)
+\donttest{data(virtualComCompetition)
 vcom <- virtualComCompetition
 
 result <- elgrin(vcom$presence, vcom$metaweb, vcom$environmentvar)

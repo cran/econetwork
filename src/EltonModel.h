@@ -25,7 +25,7 @@
 #include <Eigen/Dense>
 #include <gsl/gsl_vector.h>
 #include <EnvironmentEffect.h>
-
+#include <functional>
 
 #undef FIXEDBETA
 //#define FIXEDBETA
@@ -63,7 +63,10 @@ namespace econetwork{
     Eigen::VectorXd _sampling; // species sampling
     // utilities
     Eigen::ArrayXXd _probaPresence; // current probability that any species is present at any location
+    Eigen::ArrayXXd _weight;
+    Eigen::ArrayXXd _compat; // compatibility of any species at any location
     EltonModel();
+    void computeCompatibility(double extra=0.);
     double computeQ2(const Eigen::ArrayXXd& weight);
   public:
     EltonModel(unsigned int nbSpecies, unsigned int nbLocations,
@@ -77,7 +80,8 @@ namespace econetwork{
       _betaAbs(Eigen::VectorXd::Constant(nbLocations,betainit)),
       _peffect(nullptr),
       _epsilon(Eigen::MatrixXd::Constant(nbSpecies,nbSpecies,1.0)),
-      _samplingType(samplingType), _probaPresence(nbSpecies,nbLocations)
+      _samplingType(samplingType), _probaPresence(nbSpecies,nbLocations), _weight(nbSpecies,nbLocations),
+      _compat(Eigen::ArrayXXd::Constant(nbSpecies,nbLocations,1))
     {
       switch(_samplingType){
       case SamplingType::speciesDependent:
@@ -100,6 +104,7 @@ namespace econetwork{
     void loadEnvironment(std::shared_ptr<EnvironmentEffect> const& peffect){
       _peffect = peffect;
     }
+    void loadCompatibility(const Eigen::ArrayXXd& compat) {_compat=compat;}
     // if reinit=true, X=Y at first
     // if withY=false, Y and sampling are not used
     double simulateX(const Eigen::MatrixXd& Y, bool reinit=false, bool withY=true);
@@ -109,6 +114,7 @@ namespace econetwork{
     const Eigen::VectorXd& getAlphaLocations() const {return(_alphaLocations);}
     const Eigen::VectorXd& getBeta() const {return(_beta);}
     const Eigen::VectorXd& getBetaAbs() const {return(_betaAbs);}
+    const Eigen::ArrayXXd& getCompat() const {return(_compat);}
     double getQ2(){
       Eigen::ArrayXXd weight = (_metaA*_presX).array();
       return(computeQ2(weight));    

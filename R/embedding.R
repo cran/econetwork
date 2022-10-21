@@ -48,9 +48,9 @@ shortestPathEmbedding <- function(gList,groups=NULL,directedPath=TRUE){
   for (i in 1:length(gList)){    
     # Floyd transform
     if(directedPath){
-      D <- igraph::distances(gList[[i]],mode="out")
+      D <- distances(gList[[i]],mode="out")
     }else{
-      D <- igraph::distances(gList[[i]],mode="all")
+      D <- distances(gList[[i]],mode="all")
     }
     # mark static paths
     diag(D) <- NA    
@@ -138,8 +138,8 @@ metricsEmbedding <- function(gList){
         propBasal=sapply(gList, basalProportion),
         propTop=sapply(gList, topProportion),
         propInter=sapply(gList, intermediaryProportion),
-        sdVulnerability=sapply(gList, function(g) sd(igraph::degree(g, mode = c("in")))),
-        sdGeneralism=sapply(gList, function(g) sd(igraph::degree(g, mode = c("out")))),
+        sdVulnerability=sapply(gList, function(g) sd(degree(g, mode = c("in")))),
+        sdGeneralism=sapply(gList, function(g) sd(degree(g, mode = c("out")))),
         transitivity=sapply(gList, transitivity),
         diameter=sapply(gList, diameter, directed = TRUE),
         meanSP=sapply(gList, mean_distance),
@@ -176,7 +176,7 @@ shortWeightedTrophicLevels <- function(g){
     diag(adjmat) <- 0 # Remove Cannibalism
     SWtrophicLevels <- rep(NA, nrow(adjmat)) 
     basals <- which(rowSums(adjmat)==0)
-    D <- igraph::distances(g,mode='out')  
+    D <- distances(g,mode='out')  
     if(length(basals)>0){
         for(i in 1:nrow(adjmat)){
             DirectedDistToBasals <- D[i,basals]
